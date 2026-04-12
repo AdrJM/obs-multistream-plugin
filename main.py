@@ -1,10 +1,8 @@
 import subprocess
-
 import obspython as obs
 import os
 import os.path
 import shutil
-
 from dotenv import load_dotenv
 
 src_keys = None
@@ -105,7 +103,17 @@ def save_keys(props, prop):
         obs.obs_data_set_string(current_settings, name, key or "")
     obs.script_log(obs.LOG_INFO, "nowe klucze zapisano")
 
-    
+def build_ffmpeg_command(url, key):
+    return [
+            "ffmpeg",
+            "-i",
+            "rtmp://localhost/live/test",
+            "-c",
+            "copy",
+            "-f",
+            "flv",
+            url + "/" + str(key)
+        ]
 
 def start_stream(props, prop):  # start streaming
     global is_stream_started
@@ -116,16 +124,7 @@ def start_stream(props, prop):  # start streaming
             key = stream_keys[name]
             if enabled and key is not None:
                 try:
-                    stream_processes[name] = subprocess.Popen([
-                        "ffmpeg",
-                        "-i",
-                        "rtmp://localhost/live/test",
-                        "-c",
-                        "copy",
-                        "-f",
-                        "flv",
-                        url + "/" + str(stream_keys[name])
-                    ])
+                    stream_processes[name] = subprocess.Popen(build_ffmpeg_command(url, stream_keys[name]))
                 except Exception as e:
                     obs.script_log(obs.LOG_INFO, f"{name}: błąd - {e}")
             else:
@@ -137,7 +136,7 @@ def start_stream(props, prop):  # start streaming
 
 def stop_stream(props, prop):  # stop streaming
     global is_stream_started
-    
+
     if stream_processes:
         for name, process in stream_processes.items():
             process.terminate()
