@@ -8,9 +8,9 @@ from dotenv import load_dotenv
 src_keys = None
 stream_keys = {}
 STREAM_URL = {
-        "twitch": "rtmp://live.twitch.tv/app",
+        "twitch": "rtmp://euc10.contribute.live-video.net/app/",
         "youtube": "rtmp://a.rtmp.youtube.com/live2",
-        "kick": "rtmp://fa723fc1b171.global-contribute.live-video.net/app",
+        "kick": "rtmps://fa723fc1b171.global-contribute.live-video.net/",
         "tiktok": "rtmp://push.tiktokv.com/live"
     }
 
