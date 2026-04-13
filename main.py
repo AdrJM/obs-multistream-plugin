@@ -2,6 +2,7 @@ import subprocess
 import obspython as obs
 import os
 import os.path
+import json
 import shutil
 from dotenv import load_dotenv
 
@@ -14,6 +15,7 @@ STREAM_URL = {
         "tiktok": "rtmp://push.tiktokv.com/live"
     }
 
+server_process = None
 src_mediamtx = None
 current_settings = None
 stream_processes = {}
@@ -33,11 +35,24 @@ def script_defaults(settings):
     for name, key in stream_keys.items():
         obs.obs_data_set_string(settings, name, key or "")
 
+def on_event(event):
+    if event == obs.OBS_FRONTEND_EVENT_STREAMING_STARTED:
+        start_stream(None, None)
+    elif event == obs.OBS_FRONTEND_EVENT_STREAMING_STOPPED:
+        stop_stream(None, None)
+
 def script_load(settings):
     global current_settings 
     global src_mediamtx
     global mediamtx_process
+    global server_process
+    
 
+    obs.obs_frontend_add_event_callback(on_event)
+
+    server_process = subprocess.Popen(["python3", 
+        os.path.join(os.path.dirname(__file__), "server.py")])
+    
     current_settings = settings
 
     src_mediamtx = os.path.join(os.path.dirname(__file__), "bin", "mediamtx")
@@ -57,11 +72,14 @@ def script_load(settings):
         obs.script_log(obs.LOG_INFO, "mediamtx nie jest zainstalowany")
         return
     
+
     obs.script_log(obs.LOG_INFO, "mediamtx jest już zainstalowany")
 
 def script_unload():
     if mediamtx_process is not None:
         mediamtx_process.terminate()
+    if server_process:
+        server_process.terminate()
 
 def script_properties():
     props = obs.obs_properties_create()
@@ -79,9 +97,6 @@ def script_properties():
     obs.obs_properties_add_bool(props, "youtube_enabled", "Streamuj na YouTube")
 
     obs.obs_properties_add_button(props, "save_keys", "Zapisz klucze", save_keys)
-    
-    obs.obs_properties_add_button(props, "start_live", "Start", start_stream)
-    obs.obs_properties_add_button(props, "end_live", "End", stop_stream)
 
     return props
 
@@ -114,6 +129,14 @@ def build_ffmpeg_command(url, key):
             "flv",
             url + "/" + str(key)
         ]
+def update_status():
+    all_status = {}
+    for name in STREAM_URL:
+        all_status[name] = name in stream_processes
+    
+    src_status = os.path.join(os.path.dirname(__file__), "config", "status.json")
+    with open(src_status, "w") as f:
+        json.dump(all_status, f)
 
 def start_stream(props, prop):  # start streaming
     global is_stream_started
@@ -129,6 +152,7 @@ def start_stream(props, prop):  # start streaming
                     obs.script_log(obs.LOG_INFO, f"{name}: błąd - {e}")
             else:
                 obs.script_log(obs.LOG_INFO, f"Nie znaleziono danego klucza dla {name}")
+        update_status()
         is_stream_started = True
         obs.script_log(obs.LOG_INFO, "Rozpoczęto streamowanie")
     else:
@@ -142,5 +166,6 @@ def stop_stream(props, prop):  # stop streaming
             process.terminate()
     
     stream_processes.clear()
+    update_status()
     is_stream_started = False
     obs.script_log(obs.LOG_INFO, "Zakończono streamowanie")

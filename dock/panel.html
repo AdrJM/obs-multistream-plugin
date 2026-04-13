@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+    </head>
+    <body>
+        <div id="platform"></div>
+        <div id="status"></div>
+    
+        <script>
+            fetch('http://localhost:5000/status')
+                .then(response => response.json())
+                .then(data => {
+                    let html = ''
+                    for (const [name, active] of Object.entries(data)) {
+                        const color = active ? 'green' : 'gray'
+                        html += `<div>${name} <span style="color:${color}">●</span></div>`
+                    }
+                    platform.innerHTML = html
+                })
+        </script>
+    </body>
+</html>
