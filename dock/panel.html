@@ -13,7 +13,10 @@
                 .then(data => {
                     let html = ''
                     for (const [name, active] of Object.entries(data)) {
-                        const color = active ? 'green' : 'gray'
+                        let color
+                        if (active === true) color = 'green'
+                        else if (active === 'reconnecting') color = 'yellow'
+                        else color = 'gray'
                         html += `<div>${name} <span style="color:${color}">●</span></div>`
                     }
                     platform.innerHTML = html

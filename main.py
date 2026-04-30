@@ -1,4 +1,6 @@
 import subprocess
+import threading
+import time
 import obspython as obs
 import os
 import os.path
@@ -10,7 +12,7 @@ src_keys = None
 stream_keys = {}
 STREAM_URL = {
         "twitch": "rtmp://euc10.contribute.live-video.net/app/",
-        "youtube": "rtmp://a.rtmp.youtube.com/live2",
+        "youtube": "rtmp://b.rtmp.youtube.com/live2?backup=1",
         "kick": "rtmps://fa723fc1b171.global-contribute.live-video.net/",
         "tiktok": "rtmp://push.tiktokv.com/live"
     }
@@ -129,6 +131,7 @@ def build_ffmpeg_command(url, key):
             "flv",
             url + "/" + str(key)
         ]
+
 def update_status():
     all_status = {}
     for name in STREAM_URL:
@@ -137,6 +140,16 @@ def update_status():
     src_status = os.path.join(os.path.dirname(__file__), "config", "status.json")
     with open(src_status, "w") as f:
         json.dump(all_status, f)
+
+def monitor_streams():
+    while is_stream_started:
+        for name, process in stream_processes.items():
+            if process.poll() == None:
+                continue
+            else:
+                stream_processes[name] = subprocess.Popen(build_ffmpeg_command(STREAM_URL[name], stream_keys[name]))
+                update_status()
+        time.sleep(5)
 
 def start_stream(props, prop):  # start streaming
     global is_stream_started
@@ -154,6 +167,11 @@ def start_stream(props, prop):  # start streaming
                 obs.script_log(obs.LOG_INFO, f"Nie znaleziono danego klucza dla {name}")
         update_status()
         is_stream_started = True
+        
+        monitor_thread = threading.Thread(target=monitor_streams)
+        monitor_thread.daemon = True
+        monitor_thread.start()
+
         obs.script_log(obs.LOG_INFO, "Rozpoczęto streamowanie")
     else:
         obs.script_log(obs.LOG_INFO, "Jesteś już w trakcie streamowania")
@@ -169,3 +187,4 @@ def stop_stream(props, prop):  # stop streaming
     update_status()
     is_stream_started = False
     obs.script_log(obs.LOG_INFO, "Zakończono streamowanie")
+
