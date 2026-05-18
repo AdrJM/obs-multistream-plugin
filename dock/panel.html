@@ -2,25 +2,10 @@
 <html>
     <head>
         <meta charset="UTF-8">
+        <link rel="stylesheet" href="style.css">
+        <script src="script.js"></script>
     </head>
     <body>
         <div id="platform"></div>
-        <div id="status"></div>
-    
-        <script>
-            fetch('http://localhost:5000/status')
-                .then(response => response.json())
-                .then(data => {
-                    let html = ''
-                    for (const [name, active] of Object.entries(data)) {
-                        let color
-                        if (active === true) color = 'green'
-                        else if (active === 'reconnecting') color = 'yellow'
-                        else color = 'gray'
-                        html += `<div>${name} <span style="color:${color}">●</span></div>`
-                    }
-                    platform.innerHTML = html
-                })
-        </script>
     </body>
 </html>

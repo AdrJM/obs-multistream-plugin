@@ -12,7 +12,7 @@ src_keys = None
 stream_keys = {}
 STREAM_URL = {
         "twitch": "rtmp://euc10.contribute.live-video.net/app/",
-        "youtube": "rtmp://b.rtmp.youtube.com/live2?backup=1",
+        "youtube": "rtmp://a.rtmp.youtube.com/live2",
         "kick": "rtmps://fa723fc1b171.global-contribute.live-video.net/",
         "tiktok": "rtmp://push.tiktokv.com/live"
     }
@@ -129,27 +129,49 @@ def build_ffmpeg_command(url, key):
             "copy",
             "-f",
             "flv",
+            "-progress",
+            "pipe:2",
             url + "/" + str(key)
         ]
 
-def update_status():
+def update_status(bitrate):
     all_status = {}
     for name in STREAM_URL:
-        all_status[name] = name in stream_processes
-    
+        all_status[name] = {
+            "active": name in stream_processes, 
+            "bitrate": bitrate.get(name, "N/A")
+        }    
     src_status = os.path.join(os.path.dirname(__file__), "config", "status.json")
     with open(src_status, "w") as f:
         json.dump(all_status, f)
 
+def check_bitrate(process):
+    line = process.stderr.read1().decode('utf-8')
+    for l in line.splitlines():
+        if l.startswith('bitrate='):
+            return l.split('=')[1]
+    return "N/A"
+
 def monitor_streams():
     while is_stream_started:
+        bitrates = {}
         for name, process in stream_processes.items():
+            bitrates[name] = check_bitrate(process)
             if process.poll() == None:
                 continue
             else:
-                stream_processes[name] = subprocess.Popen(build_ffmpeg_command(STREAM_URL[name], stream_keys[name]))
-                update_status()
-        time.sleep(5)
+                src_status = os.path.join(os.path.dirname(__file__), "config", "status.json")
+                with open(src_status, "r") as f:
+                    current = json.load(f)
+                current[name] = "reconnecting"
+                with open(src_status, "w") as f:
+                    json.dump(current, f)
+                stream_processes[name] = subprocess.Popen(
+                    build_ffmpeg_command(STREAM_URL[name], stream_keys[name]),
+                    stderr = subprocess.PIPE
+                    )
+        update_status(bitrates)
+        time.sleep(2)
 
 def start_stream(props, prop):  # start streaming
     global is_stream_started
@@ -160,12 +182,15 @@ def start_stream(props, prop):  # start streaming
             key = stream_keys[name]
             if enabled and key is not None:
                 try:
-                    stream_processes[name] = subprocess.Popen(build_ffmpeg_command(url, stream_keys[name]))
+                    stream_processes[name] = subprocess.Popen(
+                        build_ffmpeg_command(url, stream_keys[name]),
+                        stderr = subprocess.PIPE
+                        )
                 except Exception as e:
                     obs.script_log(obs.LOG_INFO, f"{name}: błąd - {e}")
             else:
                 obs.script_log(obs.LOG_INFO, f"Nie znaleziono danego klucza dla {name}")
-        update_status()
+        update_status({})
         is_stream_started = True
         
         monitor_thread = threading.Thread(target=monitor_streams)
@@ -184,7 +209,7 @@ def stop_stream(props, prop):  # stop streaming
             process.terminate()
     
     stream_processes.clear()
-    update_status()
+    update_status({})
     is_stream_started = False
     obs.script_log(obs.LOG_INFO, "Zakończono streamowanie")
 
