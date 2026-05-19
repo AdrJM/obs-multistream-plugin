@@ -91,12 +91,12 @@ main.py         # OBS plugin entry point
 ## Roadmap
 
 - [ ] Custom Browser Dock panel with stream status for each platform
-- [ ] Windows support
-- [ ] Auto-restart stream on connection error
-- [ ] Stream health monitoring (bitrate, dropped frames)
-- [ ] Instagram / Facebook support
 
 ---
+
+If you find this project useful, you can support its development here:
+ 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/psychoamj)
 
 ## License
 

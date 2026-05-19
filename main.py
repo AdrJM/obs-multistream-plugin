@@ -7,6 +7,7 @@ import os.path
 import json
 import shutil
 from dotenv import load_dotenv
+import platform
 
 src_keys = None
 stream_keys = {}
@@ -23,6 +24,7 @@ current_settings = None
 stream_processes = {}
 mediamtx_process = None
 is_stream_started = False
+chat_server_process = None
 
 def script_defaults(settings):
     global src_keys, stream_keys
@@ -36,6 +38,8 @@ def script_defaults(settings):
     }
     for name, key in stream_keys.items():
         obs.obs_data_set_string(settings, name, key or "")
+    obs.obs_data_set_string(settings, "logs_path",
+        os.path.join(os.path.dirname(__file__), "logs"))
 
 def on_event(event):
     if event == obs.OBS_FRONTEND_EVENT_STREAMING_STARTED:
@@ -60,7 +64,10 @@ def script_load(settings):
     src_mediamtx = os.path.join(os.path.dirname(__file__), "bin", "mediamtx")
 
     try:
-        subprocess.check_output(["pgrep", "mediamtx"])
+        if platform.system() == "Windows":
+            subprocess.check_output(["tasklist", "/fi", "imagename eq mediamtx.exe"])
+        else: 
+            subprocess.check_output(["pgrep", "mediamtx"])
         obs.script_log(obs.LOG_INFO, "mediamtx już działa")
     except subprocess.CalledProcessError:
         mediamtx_process = subprocess.Popen(str(src_mediamtx))
@@ -82,6 +89,8 @@ def script_unload():
         mediamtx_process.terminate()
     if server_process:
         server_process.terminate()
+    if chat_server_process:
+        chat_server_process.terminate()
 
 def script_properties():
     props = obs.obs_properties_create()
@@ -99,6 +108,8 @@ def script_properties():
     obs.obs_properties_add_bool(props, "youtube_enabled", "Streamuj na YouTube")
 
     obs.obs_properties_add_button(props, "save_keys", "Zapisz klucze", save_keys)
+    obs.obs_properties_add_path(props, "logs_path", "Folder logów czatu",
+        obs.OBS_PATH_DIRECTORY, "", None)
 
     return props
 
@@ -174,9 +185,17 @@ def monitor_streams():
         time.sleep(2)
 
 def start_stream(props, prop):  # start streaming
-    global is_stream_started
+    global is_stream_started, chat_server_process
 
     if not is_stream_started:
+        logs_path = obs.obs_data_get_string(current_settings, "logs_path")
+
+        chat_server_process = subprocess.Popen([
+            "python3",
+            os.path.join(os.path.dirname(__file__), "chat_server.py"),
+            "--logs-path", logs_path
+        ])
+
         for name, url in STREAM_URL.items():
             enabled = obs.obs_data_get_bool(current_settings, name + "_enabled")
             key = stream_keys[name]
