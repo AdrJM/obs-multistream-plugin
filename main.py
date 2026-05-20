@@ -192,7 +192,7 @@ def start_stream(props, prop):  # start streaming
 
         chat_server_process = subprocess.Popen([
             "python3",
-            os.path.join(os.path.dirname(__file__), "chat_server.py"),
+            os.path.join(os.path.dirname(__file__), "chat_logs", "chat_server.py"),
             "--logs-path", logs_path
         ])
 

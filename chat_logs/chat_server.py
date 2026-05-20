@@ -4,10 +4,12 @@ import websockets.server
 import json
 from datetime import datetime, timezone
 import argparse
+from dotenv import load_dotenv
+from utils import is_platform_active
 
 connected_clients = set()
 _log_file = None
-STATUS_PATH = os.path.join(os.path.dirname(__file__), "config", "status.json")
+STATUS_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "status.json")
 
 def is_platform_active(platform: str) -> bool:
     try:
@@ -45,6 +47,17 @@ async def main():
     parser.add_argument("--logs-path", default="logs")
     args = parser.parse_args()
 
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", "config", "keys.env"))
+
+    config = {
+        "TWITCH_OAUTH":       os.getenv("TWITCH_OAUTH"),
+        "TWITCH_USERNAME":    os.getenv("TWITCH_USERNAME"),
+        "TWITCH_CHANNEL":     os.getenv("TWITCH_CHANNEL"),
+        "KICK_CHANNEL":       os.getenv("KICK_CHANNEL"),
+        "YOUTUBE_API_KEY":    os.getenv("YOUTUBE_API_KEY"),
+        "YOUTUBE_CHANNEL_ID": os.getenv("YOUTUBE_CHANNEL_ID"),
+    }
+
     os.makedirs(args.logs_path, exist_ok = True)
     stream_start = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_path = os.path.join(args.logs_path, f"{stream_start}_stream.jsonl")
@@ -53,7 +66,11 @@ async def main():
 
     async with websockets.serve(ws_handler, "localhost", 5001):
         print("WebSocket gotowy na ws://localhost:5001")
-        await asyncio.Future()
+        await asyncio.gather(
+            TwitchChat(config, broadcast).connect(),
+            KickChat(config, broadcast).connect(),
+            YouTubeChat(config, broadcast).connect(),
+        )
 
 if __name__ == "__main__":
     asyncio.run(main())

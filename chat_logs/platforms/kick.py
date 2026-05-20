@@ -3,7 +3,7 @@ import json
 import websockets.legacy.client as websockets_client
 import urllib.request
 from datetime import datetime, timezone
-from chat_server import is_platform_active
+from utils import is_platform_active
 
 PLATFORM = "kick"
 PLATFORM_LABEL = "[Kick]"
