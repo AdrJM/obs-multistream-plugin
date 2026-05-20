@@ -62,7 +62,7 @@ class YouTubeChat:
         while is_platform_active("youtube"):
             try:
                 params = {
-                    "part":       "snippet. authorDetails",
+                    "part":       "snippet, authorDetails",
                     "liveChatId": live_chat_id,
                     "key":        self.api_key,
                     "maxResults": 200,

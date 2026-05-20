@@ -6,19 +6,14 @@ from datetime import datetime, timezone
 import argparse
 from dotenv import load_dotenv
 from utils import is_platform_active
+from platforms.twitch import TwitchChat
+from platforms.kick import KickChat
+from platforms.youtube import YouTubeChat
 
 connected_clients = set()
 _log_file = None
 STATUS_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "status.json")
 
-def is_platform_active(platform: str) -> bool:
-    try:
-        with open(STATUS_PATH, "r") as f:
-            status = json.load(f)
-        return status.get(platform, {}).get("active", False)
-    except Exception:
-        return False
-    
 async def ws_handler(websocket):
     connected_clients.add(websocket)
     print(f"Nowy klient ({len(connected_clients)} łącznie)")
@@ -26,7 +21,7 @@ async def ws_handler(websocket):
         await websocket.wait_closed()
     finally:
         connected_clients.discard(websocket)
-        print(f"Klient rozłączony ({len(connected_clients)} łączenie)")
+        print(f"Klient rozłączony ({len(connected_clients)} łącznie)")
     
 async def broadcast(message: dict):
     if _log_file:
