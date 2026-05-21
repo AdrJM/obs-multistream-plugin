@@ -1,6 +1,6 @@
 import asyncio
 import os
-import websockets.server
+from websockets.asyncio.server import serve
 import json
 from datetime import datetime, timezone
 import argparse
@@ -18,7 +18,12 @@ async def ws_handler(websocket):
     connected_clients.add(websocket)
     print(f"Nowy klient ({len(connected_clients)} łącznie)")
     try:
-        await websocket.wait_closed()
+        async for message in websocket:
+            try:
+                data = json.loads(message)
+                await broadcast(data)
+            except Exception:
+                pass
     finally:
         connected_clients.discard(websocket)
         print(f"Klient rozłączony ({len(connected_clients)} łącznie)")
@@ -59,7 +64,7 @@ async def main():
     _log_file = open(log_path, "w", encoding = "utf-8")
     print(f"Plik logu: {log_path}")
 
-    async with websockets.serve(ws_handler, "localhost", 5001):
+    async with serve(ws_handler, "localhost", 5001):
         print("WebSocket gotowy na ws://localhost:5001")
         await asyncio.gather(
             TwitchChat(config, broadcast).connect(),

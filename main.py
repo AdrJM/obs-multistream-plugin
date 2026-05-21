@@ -52,7 +52,7 @@ def script_defaults(settings):
     obs.obs_data_set_string(settings, "youtube_channel_id",
         os.getenv("YOUTUBE_CHANNEL_ID") or "")
     obs.obs_data_set_string(settings, "logs_path",
-        os.path.join(os.path.dirname(__file__), "logs"))
+        os.getenv("LOGS_PATH") or os.path.join(os.path.dirname(__file__), "logs"))
 
 def on_event(event):
     if event == obs.OBS_FRONTEND_EVENT_STREAMING_STARTED:
@@ -149,6 +149,10 @@ def script_update(settings):
         if value:
             stream_keys[name] = value
 
+    logs_path = obs.obs_data_get_string(settings, "logs_path")
+    if logs_path:
+        obs.obs_data_set_string(settings, "logs_path", logs_path)
+
 def save_keys(props, prop):
     current_keys = ""
     for name in stream_keys:
@@ -168,10 +172,11 @@ def save_chat_keys(props, prop):
         "KICK_CHANNEL":       obs.obs_data_get_string(current_settings, "kick_channel"),
         "YOUTUBE_API_KEY":    obs.obs_data_get_string(current_settings, "youtube_api_key"),
         "YOUTUBE_CHANNEL_ID": obs.obs_data_get_string(current_settings, "youtube_channel_id"),
+        "LOGS_PATH":          obs.obs_data_get_string(current_settings, "logs_path"),  # ← dodaj
     }
 
     existing = {}
-    if os.path.exists(src_keys):
+    if src_keys and os.path.exists(src_keys):
         with open(src_keys, "r") as f:
             for line in f:
                 line = line.strip()
