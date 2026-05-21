@@ -38,6 +38,19 @@ def script_defaults(settings):
     }
     for name, key in stream_keys.items():
         obs.obs_data_set_string(settings, name, key or "")
+
+    obs.obs_data_set_string(settings, "twitch_oauth",
+        os.getenv("TWITCH_OAUTH") or "")
+    obs.obs_data_set_string(settings, "twitch_username",
+        os.getenv("TWITCH_USERNAME") or "")
+    obs.obs_data_set_string(settings, "twitch_channel",
+        os.getenv("TWITCH_CHANNEL") or "")
+    obs.obs_data_set_string(settings, "kick_channel",
+        os.getenv("KICK_CHANNEL") or "")
+    obs.obs_data_set_string(settings, "youtube_api_key",
+        os.getenv("YOUTUBE_API_KEY") or "")
+    obs.obs_data_set_string(settings, "youtube_channel_id",
+        os.getenv("YOUTUBE_CHANNEL_ID") or "")
     obs.obs_data_set_string(settings, "logs_path",
         os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -95,21 +108,37 @@ def script_unload():
 def script_properties():
     props = obs.obs_properties_create()
     
-    obs.obs_properties_add_text(props, "twitch", "Klucz Twitch", obs.OBS_TEXT_PASSWORD)
-    obs.obs_properties_add_bool(props, "twitch_enabled", "Streamuj na Twitch")
+    stream_group = obs.obs_properties_create()
+    obs.obs_properties_add_text(stream_group, "twitch", "Klucz Twitch", obs.OBS_TEXT_PASSWORD)
+    obs.obs_properties_add_bool(stream_group, "twitch_enabled", "Streamuj na Twitch")
 
-    obs.obs_properties_add_text(props, "kick", "Klucz Kick", obs.OBS_TEXT_PASSWORD)
-    obs.obs_properties_add_bool(props, "kick_enabled", "Streamuj na Kick")
+    obs.obs_properties_add_text(stream_group, "kick", "Klucz Kick", obs.OBS_TEXT_PASSWORD)
+    obs.obs_properties_add_bool(stream_group, "kick_enabled", "Streamuj na Kick")
     
-    obs.obs_properties_add_text(props, "tiktok", "Klucz TikTok", obs.OBS_TEXT_PASSWORD)
-    obs.obs_properties_add_bool(props, "tiktok_enabled", "Streamuj na TikTok")
+    obs.obs_properties_add_text(stream_group, "tiktok", "Klucz TikTok", obs.OBS_TEXT_PASSWORD)
+    obs.obs_properties_add_bool(stream_group, "tiktok_enabled", "Streamuj na TikTok")
 
-    obs.obs_properties_add_text(props, "youtube", "Klucz YouTube", obs.OBS_TEXT_PASSWORD)
-    obs.obs_properties_add_bool(props, "youtube_enabled", "Streamuj na YouTube")
+    obs.obs_properties_add_text(stream_group, "youtube", "Klucz YouTube", obs.OBS_TEXT_PASSWORD)
+    obs.obs_properties_add_bool(stream_group, "youtube_enabled", "Streamuj na YouTube")
 
-    obs.obs_properties_add_button(props, "save_keys", "Zapisz klucze", save_keys)
-    obs.obs_properties_add_path(props, "logs_path", "Folder logów czatu",
-        obs.OBS_PATH_DIRECTORY, "", None)
+    obs.obs_properties_add_button(stream_group, "save_keys", "Zapisz klucze", save_keys)
+    obs.obs_properties_add_group(props, "stream_group", "Ustawienia multistreamingu", obs.OBS_GROUP_NORMAL, stream_group)
+
+    chat_group = obs.obs_properties_create()
+    obs.obs_properties_add_text(chat_group, "twitch_oauth", "Twitch OAuth", obs.OBS_TEXT_PASSWORD)
+    obs.obs_properties_add_text(chat_group, "twitch_username", "Twitch nazwa konta", obs.OBS_TEXT_DEFAULT)
+    obs.obs_properties_add_text(chat_group, "twitch_channel", "Twitch kanał", obs.OBS_TEXT_DEFAULT)
+
+    obs.obs_properties_add_text(chat_group, "kick_channel", "Kick kanał", obs.OBS_TEXT_DEFAULT)
+
+    obs.obs_properties_add_text(chat_group, "youtube_api_key", "YouTube API key", obs.OBS_TEXT_PASSWORD)
+    obs.obs_properties_add_text(chat_group, "youtube_channel_id", "YouTube Channel ID", obs.OBS_TEXT_DEFAULT)
+
+    obs.obs_properties_add_path(chat_group, "logs_path", "Folder logów czatu", obs.OBS_PATH_DIRECTORY, "", None)
+
+    obs.obs_properties_add_button(chat_group, "save_chat_keys", "Zapisz klucze czatu", save_chat_keys)
+    obs.obs_properties_add_group(props, "chat_enabled", "Włącz chat logger", obs.OBS_GROUP_CHECKABLE, chat_group)
+
 
     return props
 
@@ -130,6 +159,33 @@ def save_keys(props, prop):
     for name, key in stream_keys.items():
         obs.obs_data_set_string(current_settings, name, key or "")
     obs.script_log(obs.LOG_INFO, "nowe klucze zapisano")
+
+def save_chat_keys(props, prop):
+    chat_keys = {
+        "TWITCH_OAUTH":       obs.obs_data_get_string(current_settings, "twitch_oauth"),
+        "TWITCH_USERNAME":    obs.obs_data_get_string(current_settings, "twitch_username"),
+        "TWITCH_CHANNEL":     obs.obs_data_get_string(current_settings, "twitch_channel"),
+        "KICK_CHANNEL":       obs.obs_data_get_string(current_settings, "kick_channel"),
+        "YOUTUBE_API_KEY":    obs.obs_data_get_string(current_settings, "youtube_api_key"),
+        "YOUTUBE_CHANNEL_ID": obs.obs_data_get_string(current_settings, "youtube_channel_id"),
+    }
+
+    existing = {}
+    if os.path.exists(src_keys):
+        with open(src_keys, "r") as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line:
+                    k, _, v = line.partition("=")
+                    existing[k.strip()] = v.strip()
+
+    existing.update(chat_keys)
+
+    with open(str(src_keys), "w") as f:
+        for k, v in existing.items():
+            f.write(f"{k}={v}\n")
+
+    obs.script_log(obs.LOG_INFO, "klucze czatu zapisano")
 
 def build_ffmpeg_command(url, key):
     return [
@@ -188,13 +244,14 @@ def start_stream(props, prop):  # start streaming
     global is_stream_started, chat_server_process
 
     if not is_stream_started:
-        logs_path = obs.obs_data_get_string(current_settings, "logs_path")
-
-        chat_server_process = subprocess.Popen([
-            "python3",
-            os.path.join(os.path.dirname(__file__), "chat_logs", "chat_server.py"),
-            "--logs-path", logs_path
-        ])
+        chat_enabled = obs.obs_data_get_bool(current_settings, "chat_enabled")
+        if chat_enabled:
+            logs_path = obs.obs_data_get_string(current_settings, "logs_path")
+            chat_server_process = subprocess.Popen([
+                "python3",
+                os.path.join(os.path.dirname(__file__), "chat_logs", "chat_server.py"),
+                "--logs-path", logs_path
+            ])
 
         for name, url in STREAM_URL.items():
             enabled = obs.obs_data_get_bool(current_settings, name + "_enabled")
@@ -221,11 +278,15 @@ def start_stream(props, prop):  # start streaming
         obs.script_log(obs.LOG_INFO, "Jesteś już w trakcie streamowania")
 
 def stop_stream(props, prop):  # stop streaming
-    global is_stream_started
+    global is_stream_started, chat_server_process
 
     if stream_processes:
         for name, process in stream_processes.items():
             process.terminate()
+    
+    if chat_server_process:
+        chat_server_process.terminate()
+        chat_server_process = None
     
     stream_processes.clear()
     update_status({})
