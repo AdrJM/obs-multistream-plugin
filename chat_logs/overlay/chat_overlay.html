@@ -34,7 +34,8 @@
       return { youtube: "YT", tiktok: "TT", kick: "Kick", twitch: "Twitch" }[platform] || platform;
     }
 
-    function addMessage({ platform, username, message }) {
+    function addMessage(data) {
+      const { platform, username, message } = data;
       const div = document.createElement("div");
       div.className = `msg ${platform}`;
     
@@ -49,7 +50,11 @@
     
       const text = document.createElement("span");
       text.className = "text";
-      text.textContent = message;
+      if (data.html) {
+        text.innerHTML = data.html;
+      } else {
+        text.textContent = message;
+      }
     
       div.append(badge, nick, text);
       chat.appendChild(div);

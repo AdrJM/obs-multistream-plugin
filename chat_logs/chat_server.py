@@ -53,6 +53,7 @@ async def main():
         "TWITCH_OAUTH":       os.getenv("TWITCH_OAUTH"),
         "TWITCH_USERNAME":    os.getenv("TWITCH_USERNAME"),
         "TWITCH_CHANNEL":     os.getenv("TWITCH_CHANNEL"),
+        "TWITCH_CLIENT_ID":   os.getenv("TWITCH_CLIENT_ID"),  
         "KICK_CHANNEL":       os.getenv("KICK_CHANNEL"),
         "YOUTUBE_API_KEY":    os.getenv("YOUTUBE_API_KEY"),
         "YOUTUBE_CHANNEL_ID": os.getenv("YOUTUBE_CHANNEL_ID"),
