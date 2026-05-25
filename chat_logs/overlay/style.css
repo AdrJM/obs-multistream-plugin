@@ -1,0 +1,98 @@
+:root {
+    --twitch:  #9146FF;
+    --kick:    #53FC18;
+    --youtube: #FF0000;
+    --tiktok:  #ffffff;
+    --bg-msg:  rgba(0, 0, 0, 0.6);
+    --radius:  6px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: #272a33;
+    width: 400px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 10px;
+    overflow: hidden;
+    font-family: 'Barlow', sans-serif;
+}
+
+#chat {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.msg {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: baseline;
+    gap: 6px;
+    background: var(--bg-msg);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    backdrop-filter: blur(4px);
+    border-left: 2px solid transparent;
+    animation: slideIn 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.msg.twitch  { border-left-color: var(--twitch); }
+.msg.kick    { border-left-color: var(--kick); }
+.msg.youtube { border-left-color: var(--youtube); }
+.msg.tiktok  { border-left-color: var(--tiktok); }
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+.badge {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 3px;
+    line-height: 1.6;
+    flex-shrink: 0;
+}
+
+.badge.twitch  { background: var(--twitch);  color: #fff; }
+.badge.kick    { background: var(--kick);     color: #000; }
+.badge.youtube { background: var(--youtube);  color: #fff; }
+.badge.tiktok  { background: #010101; color: var(--tiktok); border: 1px solid var(--tiktok); }
+
+.username {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.text {
+    font-size: 13px;
+    color: rgba(255,255,255,0.88);
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+
+.msg.fade {
+  animation: fadeOut 0.5s ease forwards;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
