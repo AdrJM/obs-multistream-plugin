@@ -1,6 +1,6 @@
 import asyncio
 import json
-import websockets.legacy.client as websockets_client
+from websockets.asyncio.client import connect as ws_connect
 import urllib.request
 from datetime import datetime, timezone
 from utils import is_platform_active
@@ -104,7 +104,7 @@ class KickChat:
                 pusher_channel = f"chatrooms.{chatroom_id}.v2"
                 print(f"[Kick] chatroom_id={chatroom_id}")
 
-                async with websockets_client.connect(PUSHER_URL) as ws:
+                async with ws_connect(PUSHER_URL) as ws:
                     sub = json.dumps({
                         "event": "pusher:subscribe",
                         "data": {"auth": "", "channel": pusher_channel}

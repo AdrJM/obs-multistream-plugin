@@ -1,13 +1,14 @@
 import asyncio
 import json
-import websockets.legacy.client as websockets_client
+from websockets.asyncio.client import connect as ws_connect
 from datetime import datetime, timezone
 from utils import is_platform_active
 import urllib.request
 
-PLATFORM = "twitch" 
+PLATFORM = "twitch"
 PLATFORM_LABEL = "[Twitch]"
 IRC_URL = "wss://irc-ws.chat.twitch.tv:443"
+
 
 class TwitchChat:
     def __init__(self, config: dict, broadcast_fn):
@@ -15,11 +16,12 @@ class TwitchChat:
         self.username  = config["TWITCH_USERNAME"]
         self.channel   = config["TWITCH_CHANNEL"].lower().lstrip("#")
         self.broadcast = broadcast_fn
-        self.seventv   = {}
+        self.seventv   = {}  # 7TV emote dict: {name: url}
         self.client_id = config["TWITCH_CLIENT_ID"]
-        self.token     = config["TWITCH_OAUTH"].lstrip("oauth:")
+        self.token     = config["TWITCH_OAUTH"].lstrip("oauth:")  # bare token for Helix API
 
     def _escape_html(self, text: str) -> str:
+        """Escape HTML special characters to prevent XSS in overlay innerHTML."""
         return (text
             .replace("&", "&amp;")
             .replace("<", "&lt;")
@@ -27,10 +29,18 @@ class TwitchChat:
             .replace('"', "&quot;")
             .replace("'", "&#39;")
         )
-    
 
     def _apply_emotes(self, message: str, emotes_tag: str) -> str:
+        """Replace Twitch emote codes and 7TV emote names with <img> tags.
+        
+        Twitch emotes come from IRC tags as "id:start-end,start-end/id:start-end".
+        We replace them using placeholders first (null byte delimited) to avoid
+        index shifting when substituting from right to left.
+        7TV emotes are matched word-by-word against the loaded emote dict.
+        All plain text is HTML-escaped to prevent XSS.
+        """
         placeholders = {}
+
         if emotes_tag:
             replacements = []
             for emote in emotes_tag.split("/"):
@@ -40,6 +50,7 @@ class TwitchChat:
                     start, _, end = pos.partition("-")
                     replacements.append((int(start), int(end), url))
 
+            # Sort in reverse order so substitutions don't shift remaining indices
             replacements.sort(key=lambda x: x[0], reverse=True)
 
             for i, (start, end, url) in enumerate(replacements):
@@ -48,6 +59,7 @@ class TwitchChat:
                 placeholders[placeholder] = f'<img src="{url}" alt="{self._escape_html(emote_name)}" height="20" style="vertical-align:middle">'
                 message = message[:start] + placeholder + message[end+1:]
 
+        # Process word by word — check placeholders then 7TV then plain text
         words = message.split(" ")
         result = []
         for word in words:
@@ -60,11 +72,15 @@ class TwitchChat:
                 result.append(self._escape_html(word))
 
         return " ".join(result)
-    
-    def _parse(self, raw:str) -> dict | None:
+
+    def _parse(self, raw: str) -> dict | None:
+        """Parse a raw IRC message into unified chat message format.
+        
+        Handles tagged messages (starting with @) which contain emote metadata.
+        Only processes PRIVMSG — ignores JOIN, PING, USERSTATE, etc.
+        """
         if "PRIVMSG" not in raw:
             return None
-
         try:
             tags = {}
             if raw.startswith("@"):
@@ -84,15 +100,19 @@ class TwitchChat:
                 "platform":  PLATFORM,
                 "label":     PLATFORM_LABEL,
                 "username":  username,
-                "message":   message.strip(),
+                "message":   message,
                 "html":      html,
                 "channel":   channel.lstrip("#"),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         except Exception:
             return None
-        
+
     def _get_twitch_id(self) -> str | None:
+        """Fetch Twitch user ID via Helix API — needed to load 7TV channel emotes.
+        
+        Requires a valid User Access Token (not client_credentials token).
+        """
         try:
             req = urllib.request.Request(
                 f"https://api.twitch.tv/helix/users?login={self.channel}",
@@ -109,9 +129,11 @@ class TwitchChat:
             return None
 
     async def connect(self):
+        """Wait for Twitch to go live, load 7TV emotes, then connect to IRC chat."""
         while not is_platform_active("twitch"):
             await asyncio.sleep(2)
 
+        # Load 7TV emotes — requires Twitch user ID from Helix API
         twitch_id = await asyncio.to_thread(self._get_twitch_id)
         if twitch_id:
             from platforms.seventv import _fetch_7tv_emotes
@@ -121,10 +143,10 @@ class TwitchChat:
 
         while is_platform_active("twitch"):
             try:
-                async with websockets_client.connect(IRC_URL) as ws:
+                async with ws_connect(IRC_URL) as ws:
                     await ws.send(f"PASS {self.oauth}")
                     await ws.send(f"NICK {self.username}")
-                    await ws.send(f"CAP REQ :twitch.tv/tags")
+                    await ws.send(f"CAP REQ :twitch.tv/tags")  # request emote metadata
                     await ws.send(f"JOIN #{self.channel}")
                     print(f"[Twitch] Połączono z #{self.channel}")
 

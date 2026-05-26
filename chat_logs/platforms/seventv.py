@@ -3,15 +3,23 @@ import json
 
 SEVENTV_API = "https://7tv.io/v3"
 
+
 def _fetch_7tv_emotes(platform: str, channel_id: str) -> dict:
-    """
-    Zwraca słownik {nazwa_emotki: url} dla danego kanału.
-    platform: "twitch" lub "kick"
-    channel_id: ID kanału na danej platformie
+    """Fetch 7TV emotes for a given channel and return as {name: url} dict.
+
+    Loads two sets:
+    - Global emotes: available on all channels
+    - Channel emotes: set by the streamer for their specific channel
+
+    Channel emotes override global ones if names conflict.
+
+    Args:
+        platform: "twitch" or "kick"
+        channel_id: numeric user ID on the given platform
     """
     emotes = {}
 
-    # Globalne emotki 7TV
+    # Global emotes — same for everyone, loaded first
     try:
         req = urllib.request.Request(
             f"{SEVENTV_API}/emote-sets/global",
@@ -26,7 +34,7 @@ def _fetch_7tv_emotes(platform: str, channel_id: str) -> dict:
     except Exception as e:
         print(f"[7TV] Błąd pobierania globalnych emotek: {e}")
 
-    # Kanałowe emotki 7TV
+    # Channel emotes — specific to this streamer, may override global names
     try:
         req = urllib.request.Request(
             f"{SEVENTV_API}/users/{platform}/{channel_id}",
