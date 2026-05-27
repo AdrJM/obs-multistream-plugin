@@ -112,7 +112,6 @@ def script_load(settings):
         return
     obs.script_log(obs.LOG_INFO, "mediamtx jest już zainstalowany")
 
-
 def script_unload():
     """Called when OBS unloads the script. Terminates all subprocesses."""
     global mediamtx_process, server_process, chat_server_process, http_server_process
@@ -125,6 +124,80 @@ def script_unload():
     if http_server_process:
         http_server_process.terminate()
 
+def save_chat_keys(props, prop):
+    """Save chat logger credentials to chat.env (separate from stream keys)."""
+    chat_keys = {
+        "TWITCH_OAUTH":         obs.obs_data_get_string(current_settings, "twitch_oauth"),
+        "TWITCH_USERNAME":      obs.obs_data_get_string(current_settings, "twitch_username"),
+        "TWITCH_CHANNEL":       obs.obs_data_get_string(current_settings, "twitch_channel"),
+        "TWITCH_CLIENT_ID":     obs.obs_data_get_string(current_settings, "twitch_client_id"),
+        "TWITCH_CLIENT_SECRET": obs.obs_data_get_string(current_settings, "twitch_client_secret"),
+        "KICK_CHANNEL":         obs.obs_data_get_string(current_settings, "kick_channel"),
+        "YOUTUBE_API_KEY":      obs.obs_data_get_string(current_settings, "youtube_api_key"),
+        "YOUTUBE_CHANNEL_ID":   obs.obs_data_get_string(current_settings, "youtube_channel_id"),
+        "LOGS_PATH":            obs.obs_data_get_string(current_settings, "logs_path"),
+    }
+
+    chat_keys_path = os.path.join(os.path.dirname(__file__), "config", "chat.env")
+    with open(chat_keys_path, "w") as f:
+        for k, v in chat_keys.items():
+            f.write(f"{k}={v}\n")
+
+    obs.script_log(obs.LOG_INFO, "klucze czatu zapisano")
+
+def twitch_login(props, prop):
+    """Open browser for Twitch OAuth login and save token to chat.env automatically."""
+    old_token = obs.obs_data_get_string(current_settings, "twitch_oauth")
+    
+    subprocess.Popen([
+        "python3",
+        os.path.join(os.path.dirname(__file__), "chat_logs", "twitch_auth.py")
+    ])
+    
+    def wait_for_token():
+        import time
+        chat_keys_path = os.path.join(os.path.dirname(__file__), "config", "chat.env")
+        for _ in range(60):  
+            time.sleep(1)
+            values = {}
+            if os.path.exists(chat_keys_path):
+                with open(chat_keys_path, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if "=" in line:
+                            k, _, v = line.partition("=")
+                            values[k.strip()] = v.strip()
+            new_token = values.get("TWITCH_OAUTH", "")
+            if new_token and new_token != old_token:
+                refresh_chat_keys(None, None)
+                obs.script_log(obs.LOG_INFO, "Token Twitcha zaktualizowany automatycznie")
+                return
+    
+    threading.Thread(target=wait_for_token, daemon=True).start()
+
+def refresh_chat_keys(props, prop):
+    chat_keys_path = os.path.join(os.path.dirname(__file__), "config", "chat.env")
+    
+    values = {}
+    if os.path.exists(chat_keys_path):
+        with open(chat_keys_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line:
+                    k, _, v = line.partition("=")
+                    values[k.strip()] = v.strip()
+    
+    obs.obs_data_set_string(current_settings, "twitch_oauth", values.get("TWITCH_OAUTH", ""))
+    obs.obs_data_set_string(current_settings, "twitch_client_id", values.get("TWITCH_CLIENT_ID", ""))
+    obs.obs_data_set_string(current_settings, "twitch_client_secret", values.get("TWITCH_CLIENT_SECRET", ""))
+    obs.obs_data_set_string(current_settings, "twitch_username", values.get("TWITCH_USERNAME", ""))
+    obs.obs_data_set_string(current_settings, "twitch_channel", values.get("TWITCH_CHANNEL", ""))
+    obs.obs_data_set_string(current_settings, "kick_channel", values.get("KICK_CHANNEL", ""))
+    obs.obs_data_set_string(current_settings, "youtube_api_key", values.get("YOUTUBE_API_KEY", ""))
+    obs.obs_data_set_string(current_settings, "youtube_channel_id", values.get("YOUTUBE_CHANNEL_ID", ""))
+    obs.obs_data_set_string(current_settings, "logs_path", values.get("LOGS_PATH", ""))
+    
+    obs.script_log(obs.LOG_INFO, "dane czatu odświeżone")
 
 def script_properties():
     """Build the OBS script settings UI with two collapsible groups."""
@@ -145,6 +218,8 @@ def script_properties():
 
     # ── Chat logger group (checkable = enabled/disabled) ──────────────────────
     chat_group = obs.obs_properties_create()
+    obs.obs_properties_add_button(chat_group, "twitch_login", "Połącz z Twitchem", twitch_login)
+    obs.obs_properties_add_button(chat_group, "refresh_keys", "Odśwież dane z pliku", refresh_chat_keys)
     obs.obs_properties_add_text(chat_group, "twitch_oauth", "Twitch OAuth", obs.OBS_TEXT_PASSWORD)
     obs.obs_properties_add_text(chat_group, "twitch_client_id", "Twitch Client ID", obs.OBS_TEXT_DEFAULT)
     obs.obs_properties_add_text(chat_group, "twitch_client_secret", "Twitch Client Secret", obs.OBS_TEXT_PASSWORD)
@@ -156,6 +231,8 @@ def script_properties():
     obs.obs_properties_add_path(chat_group, "logs_path", "Folder logów czatu", obs.OBS_PATH_DIRECTORY, "", None)
     obs.obs_properties_add_button(chat_group, "save_chat_keys", "Zapisz klucze czatu", save_chat_keys)
     obs.obs_properties_add_group(props, "chat_enabled", "Włącz chat logger", obs.OBS_GROUP_CHECKABLE, chat_group)
+    
+    obs.script_log(obs.LOG_INFO, "dane czatu odświeżone")
 
     return props
 
@@ -185,29 +262,6 @@ def save_keys(props, prop):
     for name, key in stream_keys.items():
         obs.obs_data_set_string(current_settings, name, key or "")
     obs.script_log(obs.LOG_INFO, "nowe klucze zapisano")
-
-
-def save_chat_keys(props, prop):
-    """Save chat logger credentials to chat.env (separate from stream keys)."""
-    chat_keys = {
-        "TWITCH_OAUTH":         obs.obs_data_get_string(current_settings, "twitch_oauth"),
-        "TWITCH_USERNAME":      obs.obs_data_get_string(current_settings, "twitch_username"),
-        "TWITCH_CHANNEL":       obs.obs_data_get_string(current_settings, "twitch_channel"),
-        "TWITCH_CLIENT_ID":     obs.obs_data_get_string(current_settings, "twitch_client_id"),
-        "TWITCH_CLIENT_SECRET": obs.obs_data_get_string(current_settings, "twitch_client_secret"),
-        "KICK_CHANNEL":         obs.obs_data_get_string(current_settings, "kick_channel"),
-        "YOUTUBE_API_KEY":      obs.obs_data_get_string(current_settings, "youtube_api_key"),
-        "YOUTUBE_CHANNEL_ID":   obs.obs_data_get_string(current_settings, "youtube_channel_id"),
-        "LOGS_PATH":            obs.obs_data_get_string(current_settings, "logs_path"),
-    }
-
-    chat_keys_path = os.path.join(os.path.dirname(__file__), "config", "chat.env")
-    with open(chat_keys_path, "w") as f:
-        for k, v in chat_keys.items():
-            f.write(f"{k}={v}\n")
-
-    obs.script_log(obs.LOG_INFO, "klucze czatu zapisano")
-
 
 def build_ffmpeg_command(url, key):
     """Build ffmpeg command to forward local RTMP stream to a platform."""
