@@ -61,10 +61,17 @@ def callback():
     # Save tokens to chat.env
     _save_tokens(access_token, refresh_token)
 
-    # Shut down server after successful auth
-    threading.Thread(target=_shutdown).start()
-    return "<h2>✓ Zalogowano pomyślnie! Możesz zamknąć tę kartę.</h2>"
+    # Fetch and save username automatically
+    user = _fetch_twitch_user(access_token, CLIENT_ID)
+    if user:
+        _save_user(user["login"])
+        msg = f"<h2>✓ Zalogowano jako {user['display_name']}! Możesz zamknąć tę kartę.</h2>"
+    else:
+        msg = "<h2>✓ Zalogowano pomyślnie! Możesz zamknąć tę kartę.</h2>"
 
+    # Shut down server
+    threading.Thread(target=_shutdown).start()
+    return msg
 
 def _save_tokens(access_token: str, refresh_token: str):
     """Update TWITCH_OAUTH and TWITCH_REFRESH_TOKEN in chat.env."""
@@ -85,6 +92,43 @@ def _save_tokens(access_token: str, refresh_token: str):
             f.write(f"{k}={v}\n")
 
     print(f"[TwitchAuth] Token zapisany do chat.env")
+
+def _fetch_twitch_user(access_token: str, client_id: str) -> dict | None:
+    """Fetch Twitch username from Helix API using the fresh access token."""
+    try:
+        req = urllib.request.Request(
+            "https://api.twitch.tv/helix/users",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Client-Id":     client_id,
+            }
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+            return data["data"][0]
+    except Exception as e:
+        print(f"[TwitchAuth] Nie można pobrać danych użytkownika: {e}")
+        return None
+
+def _save_user(username: str):
+    """Save TWITCH_USERNAME and TWITCH_CHANNEL to chat.env."""
+    existing = {}
+    if os.path.exists(CHAT_ENV):
+        with open(CHAT_ENV, "r") as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line:
+                    k, _, v = line.partition("=")
+                    existing[k.strip()] = v.strip()
+
+    existing["TWITCH_USERNAME"] = username
+    existing["TWITCH_CHANNEL"]  = username  # same as username by default
+
+    with open(CHAT_ENV, "w") as f:
+        for k, v in existing.items():
+            f.write(f"{k}={v}\n")
+
+    print(f"[TwitchAuth] Username zapisany: {username}")
 
 
 def _shutdown():

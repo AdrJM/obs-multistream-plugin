@@ -50,16 +50,10 @@ def script_defaults(settings):
         obs.obs_data_set_string(settings, name, key or "")
 
     # Chat logger credentials
-    obs.obs_data_set_string(settings, "twitch_oauth",
-        os.getenv("TWITCH_OAUTH") or "")
     obs.obs_data_set_string(settings, "twitch_client_id",
         os.getenv("TWITCH_CLIENT_ID") or "")
     obs.obs_data_set_string(settings, "twitch_client_secret",
         os.getenv("TWITCH_CLIENT_SECRET") or "")
-    obs.obs_data_set_string(settings, "twitch_username",
-        os.getenv("TWITCH_USERNAME") or "")
-    obs.obs_data_set_string(settings, "twitch_channel",
-        os.getenv("TWITCH_CHANNEL") or "")
     obs.obs_data_set_string(settings, "kick_channel",
         os.getenv("KICK_CHANNEL") or "")
     obs.obs_data_set_string(settings, "youtube_api_key",
@@ -123,7 +117,7 @@ def script_unload():
         chat_server_process.terminate()
     if http_server_process:
         http_server_process.terminate()
-        
+
 def save_chat_keys(props, prop):
     """Save chat logger credentials to chat.env (separate from stream keys).
     
@@ -217,11 +211,8 @@ def refresh_chat_keys(props, prop):
                     k, _, v = line.partition("=")
                     values[k.strip()] = v.strip()
     
-    obs.obs_data_set_string(current_settings, "twitch_oauth",        values.get("TWITCH_OAUTH", ""))
     obs.obs_data_set_string(current_settings, "twitch_client_id",    values.get("TWITCH_CLIENT_ID", ""))
     obs.obs_data_set_string(current_settings, "twitch_client_secret",values.get("TWITCH_CLIENT_SECRET", ""))
-    obs.obs_data_set_string(current_settings, "twitch_username",     values.get("TWITCH_USERNAME", ""))
-    obs.obs_data_set_string(current_settings, "twitch_channel",      values.get("TWITCH_CHANNEL", ""))
     obs.obs_data_set_string(current_settings, "kick_channel",        values.get("KICK_CHANNEL", ""))
     obs.obs_data_set_string(current_settings, "youtube_api_key",     values.get("YOUTUBE_API_KEY", ""))
     obs.obs_data_set_string(current_settings, "youtube_channel_id",  values.get("YOUTUBE_CHANNEL_ID", ""))
@@ -251,11 +242,8 @@ def script_properties():
     chat_group = obs.obs_properties_create()
     obs.obs_properties_add_button(chat_group, "twitch_login", "Połącz z Twitchem", twitch_login)
     obs.obs_properties_add_button(chat_group, "refresh_keys", "Odśwież dane z pliku", refresh_chat_keys)
-    obs.obs_properties_add_text(chat_group, "twitch_oauth", "Twitch OAuth", obs.OBS_TEXT_PASSWORD)
     obs.obs_properties_add_text(chat_group, "twitch_client_id", "Twitch Client ID", obs.OBS_TEXT_DEFAULT)
     obs.obs_properties_add_text(chat_group, "twitch_client_secret", "Twitch Client Secret", obs.OBS_TEXT_PASSWORD)
-    obs.obs_properties_add_text(chat_group, "twitch_username", "Twitch nazwa konta", obs.OBS_TEXT_DEFAULT)
-    obs.obs_properties_add_text(chat_group, "twitch_channel", "Twitch kanał", obs.OBS_TEXT_DEFAULT)
     obs.obs_properties_add_text(chat_group, "kick_channel", "Kick kanał", obs.OBS_TEXT_DEFAULT)
     obs.obs_properties_add_text(chat_group, "youtube_api_key", "YouTube API key", obs.OBS_TEXT_PASSWORD)
     obs.obs_properties_add_text(chat_group, "youtube_channel_id", "YouTube Channel ID", obs.OBS_TEXT_DEFAULT)
