@@ -1,13 +1,18 @@
+// Fetch stream status from Flask server and update the dock UI
 function updateStatus(){
                 fetch('http://localhost:5000/status')
                     .then(response => response.json())
                     .then(data => {
                         let html = ''
+
                         for (const [name, stats] of Object.entries(data)) {
+                            // Determine indicator color based on stream state
                             let color
                             if (stats.active === true) color = 'green'
                             else if (stats.active === 'reconnecting') color = 'yellow'
                             else color = 'gray'
+
+                            // Append platform icon SVG
                             if (name === "twitch")
                             html += `
                                 <svg xmlns="http://www.w3.org/2000/svg" color="purple" width="20px" height="20px"   fill="currentColor" class="bi bi-twitch" viewBox="0 0 16 16">
@@ -31,7 +36,8 @@ function updateStatus(){
                                         <!--Boxicons v3.0.8 https://boxicons.com | License  https://docs.boxicons.com/free-->
                                         <path d="M3.98 3h6.01v4h2V5h2V3H20v6.01h-2v2h-2v2h2v2h2v6.01h-6.01v-2h-2v-2h-2v4H3.98z"/>
                                     </svg>`
-
+                            
+                            // Append colored status dot and bitrate
                             html += ` <span style="color:${color}">● </span> <i class="bi bi-twitch"></i>`
                             if (stats.bitrate === "N/A") html += `bitrate: 0<br>`
                             else html += `bitrate: ${stats.bitrate} <br>`
@@ -40,5 +46,6 @@ function updateStatus(){
                     })
             }
 
+            // Poll status every 3 seconds and run immediately on load
             setInterval(updateStatus, 3000)
             updateStatus()

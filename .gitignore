@@ -1,2 +1,5 @@
 .env
+config/keys.env
 keys/*.env
+chat_logs/logs/
+config/chat.env

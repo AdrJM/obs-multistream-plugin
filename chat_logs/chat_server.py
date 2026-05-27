@@ -38,6 +38,7 @@ async def ws_handler(websocket):
 
 
 async def broadcast(message: dict):
+    print(f"[broadcast] wysyłam: {message.get('username')} - {message.get('message', '')[:30]}")
     """Save message to log file and send to all connected overlay clients.
     
     Called by platform connectors (Twitch, Kick, YouTube) on every chat message.
