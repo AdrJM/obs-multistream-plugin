@@ -1,3 +1,5 @@
+import sys
+
 import subprocess
 import threading
 import time
@@ -15,6 +17,7 @@ stream_keys = {}        # dict of stream keys per platform
 STREAM_URL = {          # RTMP endpoints for each platform
         "twitch": "rtmp://euc10.contribute.live-video.net/app/",
         "youtube": "rtmp://a.rtmp.youtube.com/live2",
+        
         "kick": "rtmps://fa723fc1b171.global-contribute.live-video.net/",
         "tiktok": "rtmp://push.tiktokv.com/live"
     }
@@ -46,8 +49,6 @@ def script_defaults(settings):
         "tiktok": os.getenv("TIKTOK_KEY"),    
         "youtube": os.getenv("YOUTUBE_KEY")
     }
-    for name, key in stream_keys.items():
-        obs.obs_data_set_string(settings, name, key or "")
 
     # Chat logger credentials
     obs.obs_data_set_string(settings, "twitch_client_id",
@@ -70,10 +71,21 @@ def on_event(event):
         start_stream(None, None)
     elif event == obs.OBS_FRONTEND_EVENT_STREAMING_STOPPED:
         stop_stream(None, None)
+        
+def token_exists():
+    chat_keys_path = os.path.join(os.path.dirname(__file__), "config", "chat.env")
+    if os.path.exists(chat_keys_path):
+        with open(chat_keys_path, "r") as f:
+            for line in f:
+                if line.startswith("TWITCH_OAUTH="):
+                    token = line.split("=")[1].strip()
+                    return token != ""
+    return False
 
 
 def script_load(settings):
     """Called when OBS loads the script. Starts mediamtx and status server."""
+    
     global current_settings, src_mediamtx, mediamtx_process, server_process
 
     obs.obs_frontend_add_event_callback(on_event)
@@ -84,6 +96,9 @@ def script_load(settings):
     
     current_settings = settings
     src_mediamtx = os.path.join(os.path.dirname(__file__), "bin", "mediamtx")
+    
+    if not token_exists():
+            twitch_login(None, None)
 
     # Start mediamtx only if not already running
     try:
@@ -240,7 +255,6 @@ def script_properties():
 
     # ── Chat logger group (checkable = enabled/disabled) ──────────────────────
     chat_group = obs.obs_properties_create()
-    obs.obs_properties_add_button(chat_group, "twitch_login", "Połącz z Twitchem", twitch_login)
     obs.obs_properties_add_button(chat_group, "refresh_keys", "Odśwież dane z pliku", refresh_chat_keys)
     obs.obs_properties_add_text(chat_group, "twitch_client_id", "Twitch Client ID", obs.OBS_TEXT_DEFAULT)
     obs.obs_properties_add_text(chat_group, "twitch_client_secret", "Twitch Client Secret", obs.OBS_TEXT_PASSWORD)
@@ -278,15 +292,15 @@ def save_keys(props, prop):
         current_keys += name.upper() + "_KEY=" + str(stream_keys[name]) + "\n"  
     with open(str(src_keys), "w") as f:
         f.write(current_keys)
-    for name, key in stream_keys.items():
-        obs.obs_data_set_string(current_settings, name, key or "")
+    for name in stream_keys:
+        obs.obs_data_set_string(current_settings, name, "")
     obs.script_log(obs.LOG_INFO, "nowe klucze zapisano")
 
 def build_ffmpeg_command(url, key):
     """Build ffmpeg command to forward local RTMP stream to a platform."""
     return [
         "ffmpeg",
-        "-i", "rtmp://localhost/live/test",  # input from mediamtx
+        "-i", "rtmp://localhost/live",  # input from mediamtx
         "-c", "copy",                         # no re-encoding
         "-f", "flv",
         "-progress", "pipe:2",                # bitrate output to stderr

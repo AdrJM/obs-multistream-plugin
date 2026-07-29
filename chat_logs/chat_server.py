@@ -10,12 +10,10 @@ from platforms.twitch import TwitchChat
 from platforms.kick import KickChat
 from platforms.youtube import YouTubeChat
 
-# Set of active WebSocket connections (OBS overlay clients)
-connected_clients = set()
-
-# Open log file — written to by broadcast() on every incoming message
-_log_file = None
-
+# ── Global state ──────────────────────────────────────────────────────────────
+connected_clients = set() # Set of active WebSocket connections (OBS overlay clients)
+_log_file = None          # Open log file — written to by broadcast() on every incoming message
+connectors = {}           #{platform: connector_instance}
 
 async def ws_handler(websocket):
     """Handle a single WebSocket connection from the chat overlay.
@@ -29,7 +27,31 @@ async def ws_handler(websocket):
         async for message in websocket:
             try:
                 data = json.loads(message)
-                await broadcast(data)
+                if data.get("type") in ("send", "mod"):
+                    print(f"[Handler] Odebrano: {data}")
+                    if data.get("type") == "send":
+                        platform = data.get("platform")
+                        message  = data.get("message", "")
+                        if platform == "all":
+                            for connector in connectors.values():
+                                if hasattr(connector, "send_message"):
+                                    await connector.send_message(message)
+                        elif platform in connectors:
+                            await connectors[platform].send_message(message)
+                    elif data.get("type") == "mod":
+                        platform = data.get("platform")
+                        if platform in connectors:
+                            connector = connectors[platform]
+                            if hasattr(connector, "moderate"):
+                                await connector.moderate(
+                                    action=data.get("action", ""),
+                                    username=data.get("username", ""),
+                                    msg_id=data.get("msg_id", ""),
+                                    user_id=data.get("user_id", ""),
+                                    duration=data.get("duration", 60),
+                                )
+                else:
+                    await broadcast(data)
             except Exception:
                 pass
     finally:
@@ -90,10 +112,18 @@ async def main():
     # Start WebSocket server and all platform connectors concurrently
     async with serve(ws_handler, "localhost", 5001):
         print("WebSocket gotowy na ws://localhost:5001")
+        twitch = TwitchChat(config, broadcast)
+        kick   = KickChat(config, broadcast)
+        youtube = YouTubeChat(config, broadcast)
+
+        connectors["twitch"]  = twitch
+        connectors["kick"]    = kick
+        connectors["youtube"] = youtube
+
         await asyncio.gather(
-            TwitchChat(config, broadcast).connect(),
-            KickChat(config, broadcast).connect(),
-            YouTubeChat(config, broadcast).connect(),
+            twitch.connect(),
+            kick.connect(),
+            youtube.connect(),
         )
 
 

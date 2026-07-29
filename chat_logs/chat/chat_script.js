@@ -15,6 +15,7 @@ const ICONS = {
 // Same username always gets the same color across sessions.
 const COLORS = ["#FF6B6B","#FFD93D","#6BCB77","#4D96FF","#C77DFF","#FF9F1C","#2EC4B6","#F7B731","#45B7D1","#FF6EB4"];
 function nickColor(name) {
+    if (!name) return COLORS[0];  
     let h = 0;
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
     return COLORS[h % COLORS.length];
@@ -24,7 +25,7 @@ function nickColor(name) {
 // Uses data.html (with emote <img> tags) when available, falls back to plain text.
 // html field is generated server-side and already XSS-safe.
 function addMessage(data) {
-    const { platform, username, message } = data;
+    const { platform, username = "unknown", message, html, id } = data;
 
     const div = document.createElement("div");
     div.className = `msg ${platform}`;

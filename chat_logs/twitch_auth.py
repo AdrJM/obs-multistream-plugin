@@ -12,7 +12,7 @@ app = Flask(__name__)
 BASE_DIR   = os.path.join(os.path.dirname(__file__), "..")
 CHAT_ENV   = os.path.join(BASE_DIR, "config", "chat.env")
 REDIRECT   = "http://localhost:5002/callback"
-SCOPES     = "chat:read"
+SCOPES = "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users channel:moderate"
 
 load_dotenv(CHAT_ENV)
 CLIENT_ID     = os.getenv("TWITCH_CLIENT_ID")

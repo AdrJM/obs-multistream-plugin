@@ -19,6 +19,7 @@ class TwitchChat:
         self.seventv   = {}  # 7TV emote dict: {name: url}
         self.client_id = config["TWITCH_CLIENT_ID"]
         self.token     = config["TWITCH_OAUTH"].lstrip("oauth:")  # bare token for Helix API
+        self._ws = None # active IRC WebSocket connection
 
     def _escape_html(self, text: str) -> str:
         """Escape HTML special characters to prevent XSS in overlay innerHTML."""
@@ -89,13 +90,14 @@ class TwitchChat:
                     k, _, v = tag.partition("=")
                     tags[k] = v
 
+            print(f"[Twitch] tags id={tags.get('id')} user-id={tags.get('user-id')}")         
+
             prefix, _, rest = raw.partition(" PRIVMSG ")
             username = prefix.lstrip(":").split("!")[0]
             channel, _, message = rest.partition(" :")
             message = message.strip()
 
             html = self._apply_emotes(message, tags.get("emotes", ""))
-
             return {
                 "platform":  PLATFORM,
                 "label":     PLATFORM_LABEL,
@@ -104,6 +106,8 @@ class TwitchChat:
                 "html":      html,
                 "channel":   channel.lstrip("#"),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
+                "id":        tags.get("id", ""),       
+                "user_id":   tags.get("user-id", ""), 
             }
         except Exception:
             return None
@@ -144,6 +148,7 @@ class TwitchChat:
         while is_platform_active("twitch"):
             try:
                 async with ws_connect(IRC_URL) as ws:
+                    self._ws = ws 
                     await ws.send(f"PASS {self.oauth}")
                     await ws.send(f"NICK {self.username}")
                     await ws.send(f"CAP REQ :twitch.tv/tags")  # request emote metadata
@@ -160,6 +165,77 @@ class TwitchChat:
                         if msg:
                             await self.broadcast(msg)
 
+                    self._ws = None
+
             except Exception as e:
+                self._ws = None
                 print(f"[Twitch] Błąd: {e}. Ponawianie za 5s...")
                 await asyncio.sleep(5)
+
+    async def send_message(self, message: str):
+        """Send a message to Twitch chat via IRC."""
+        print(f"[Twitch] send_message wywołane, _ws={self._ws is not None}, msg={message}")
+        if self._ws:
+            await self._ws.send(f"PRIVMSG #{self.channel} :{message}")
+            
+            # Broadcast manually since Twitch doesn't echo own messages back
+            await self.broadcast({
+                "platform":  PLATFORM,
+                "label":     PLATFORM_LABEL,
+                "username":  self.username,
+                "message":   message,
+                "html":      self._escape_html(message),
+                "channel":   self.channel,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+
+    def _api_delete(self, url: str, headers: dict):
+        req = urllib.request.Request(url, headers=headers, method="DELETE")
+        try:
+            urllib.request.urlopen(req, timeout=10)
+            print(f"[Twitch] DELETE {url} OK")
+        except Exception as e:
+            print(f"[Twitch] DELETE błąd: {e}")
+
+    def _api_post(self, url: str, headers: dict, body: bytes):
+        req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        try:
+            urllib.request.urlopen(req, timeout=10)
+            print(f"[Twitch] POST {url} OK")
+        except Exception as e:
+            print(f"[Twitch] POST błąd: {e}")        
+
+    async def moderate(self, action: str, username: str, msg_id: str = "", user_id: str = "", duration: int = 0):
+        """Perform moderation action via Twitch Helix API."""
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Client-Id":     self.client_id,
+            "Content-Type":  "application/json",
+        }
+        
+        # Get broadcaster ID (needed for all mod endpoints)
+        broadcaster_id = await asyncio.to_thread(self._get_twitch_id)
+        if not broadcaster_id:
+            print("[Twitch] Nie można wykonać moderacji — brak broadcaster_id")
+            return
+
+        match action:
+            case "delete":
+                # Delete specific message
+                url = f"https://api.twitch.tv/helix/moderation/chat?broadcaster_id={broadcaster_id}&moderator_id={broadcaster_id}&message_id={msg_id}"
+                await asyncio.to_thread(self._api_delete, url, headers)
+
+            case "timeout":
+                # Timeout user
+                url = f"https://api.twitch.tv/helix/moderation/bans?broadcaster_id={broadcaster_id}&moderator_id={broadcaster_id}"
+                body = json.dumps({"data": {"user_id": user_id, "duration": duration, "reason": ""}}).encode()
+                await asyncio.to_thread(self._api_post, url, headers, body)
+
+            case "ban":
+                # Permanent ban
+                url = f"https://api.twitch.tv/helix/moderation/bans?broadcaster_id={broadcaster_id}&moderator_id={broadcaster_id}"
+                body = json.dumps({"data": {"user_id": user_id, "reason": ""}}).encode()
+                await asyncio.to_thread(self._api_post, url, headers, body)
+
+            case _:
+                print(f"[Twitch] Nieznana akcja moderacji: {action}")

@@ -3,7 +3,7 @@
     --kick:    #53FC18;
     --youtube: #FF0000;
     --tiktok:  #ffffff;
-    --bg-msg:  rgba(0, 0, 0, 0);
+    --bg-msg:  rgba(0, 0, 0, 0.8);
     --radius:  6px;
 }
 
@@ -15,7 +15,7 @@ body {
     height: 100vh;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
+    justify-content: flex-start;
     padding: 10px;
     overflow: hidden;
     font-family: 'Barlow', sans-serif;

@@ -1,0 +1,180 @@
+:root {
+    --bg:        #272a33;
+    --bg2:       #1e2028;
+    --bg3:       #32363f;
+    --border:    #3a3d47;
+    --text:      #d4d7e0;
+    --muted:     #6b7080;
+    --twitch:    #9146FF;
+    --kick:      #53FC18;
+    --youtube:   #FF0000;
+    --tiktok:    #69C9D0;
+    --all:       #4D96FF;
+    --danger:    #ff4444;
+    --warn:      #FFD93D;
+    --radius:    6px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── Messages list ───────────────────────────────────────────────── */
+#chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+#chat::-webkit-scrollbar { width: 4px; }
+#chat::-webkit-scrollbar-track { background: transparent; }
+#chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.msg {
+    display: grid;
+    grid-template-columns: 16px auto 1fr auto;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 7px;
+    border-radius: var(--radius);
+    background: var(--bg2);
+    border-left: 2px solid transparent;
+    animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.msg.twitch  { border-left-color: var(--twitch); }
+.msg.kick    { border-left-color: var(--kick); }
+.msg.youtube { border-left-color: var(--youtube); }
+.msg.tiktok  { border-left-color: var(--tiktok); }
+
+.msg-icon svg { display: block; }
+.msg-icon.twitch  svg { color: var(--twitch); }
+.msg-icon.kick    svg { color: var(--kick); }
+.msg-icon.youtube svg { color: var(--youtube); }
+.msg-icon.tiktok  svg { color: var(--tiktok); }
+
+.msg-nick {
+    font-weight: 600;
+    font-size: 12px;
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.msg-text {
+    color: var(--text);
+    line-height: 1.35;
+    word-break: break-word;
+    min-width: 0;
+}
+
+.msg-text img { height: 18px; vertical-align: middle; }
+
+/* Mod buttons — hidden, shown on hover */
+.msg-actions {
+    display: flex;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+}
+.msg:hover .msg-actions { opacity: 1; }
+
+.mod-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 3px;
+    padding: 2px 5px;
+    cursor: pointer;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.1s;
+    white-space: nowrap;
+}
+.mod-btn:hover { border-color: var(--danger); color: var(--danger); }
+.mod-btn.warn:hover { border-color: var(--warn); color: var(--warn); }
+
+/* ── Composer ─────────────────────────────────────────────────────── */
+#composer {
+    border-top: 1px solid var(--border);
+    padding: 8px 6px;
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    background: var(--bg2);
+}
+
+#platform-select {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 5px 6px;
+    font-size: 12px;
+    font-family: 'Barlow', sans-serif;
+    cursor: pointer;
+    flex-shrink: 0;
+    outline: none;
+}
+
+#msg-input {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 5px 8px;
+    font-size: 13px;
+    font-family: 'Barlow', sans-serif;
+    outline: none;
+    transition: border-color 0.15s;
+    min-width: 0;
+}
+#msg-input:focus { border-color: var(--all); }
+#msg-input::placeholder { color: var(--muted); }
+
+#send-btn {
+    background: var(--all);
+    border: none;
+    color: #fff;
+    border-radius: var(--radius);
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'Barlow', sans-serif;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+}
+#send-btn:hover { opacity: 0.85; }
+
+/* ── Status bar ───────────────────────────────────────────────────── */
+#statusbar {
+    padding: 3px 8px;
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+}
+#statusbar span { transition: color 0.3s; }
+#statusbar span.ok  { color: var(--kick); }
+#statusbar span.err { color: var(--danger); }
